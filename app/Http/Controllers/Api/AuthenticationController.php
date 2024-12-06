@@ -9,7 +9,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Password;
-
+use Illuminate\Support\Facades\Storage;
 
 class AuthenticationController extends Controller
 {
@@ -125,6 +125,71 @@ class AuthenticationController extends Controller
         'success' => true,
         'message' => 'Đăng ký thành công!',
     ], 200);
+}
+// Xử lý cập nhật profile trong controller (Laravel ví dụ)
+public function updateProfile(Request $request) {
+    // Validate input dữ liệu
+    $data = $request->validate([
+        'full_name' => 'required|string|max:255',
+        'email' => 'required|email|max:255',
+        'phone' => 'nullable|string',
+        'address' => 'nullable|string',
+        'photo' => 'nullable|image', // Validate ảnh nếu có
+    ]);
+
+    // Lấy thông tin người dùng hiện tại
+    $user = Auth::user();
+    $user->full_name = $data['full_name'];
+    $user->email = $data['email'];
+    $user->phone = $data['phone'];
+    $user->address = $data['address'];
+
+    // Kiểm tra nếu người dùng có gửi ảnh mới
+    if ($request->hasFile('photo')) {
+        // Xóa ảnh cũ nếu có
+        if ($user->photo) {
+            // Xóa ảnh cũ khỏi storage
+            Storage::delete('public/' . $user->photo);
+        }
+
+        // Lưu ảnh mới vào thư mục 'avatars'
+        $photo = $request->file('photo');
+        $photoPath = $photo->store('avatars', 'public'); // Lưu ảnh trong thư mục 'avatars'
+
+        // Lưu đường dẫn đầy đủ vào cơ sở dữ liệu
+        $user->photo = 'http://127.0.0.1:8000/storage/avatar/' . basename($photoPath); // Lưu đường dẫn ảnh mới
+    }
+
+    // Lưu thông tin người dùng đã cập nhật
+    $user->save();
+
+    // Trả về phản hồi
+    return response()->json([
+        'message' => 'Profile updated successfully',
+        'user' => $user,
+    ]);
+}
+
+
+
+public function getProfile(Request $request)
+{
+    // Lấy thông tin người dùng đã đăng nhập
+    $user = Auth::user();  // Sử dụng Auth để lấy người dùng hiện tại
+
+    // Nếu không có người dùng đăng nhập, trả về lỗi 401
+    if (!$user) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    // Trả về thông tin người dùng dưới dạng JSON
+    return response()->json([
+        'full_name' => $user->full_name,
+        'email' => $user->email,
+        'phone' => $user->phone,
+        'address' => $user->address,
+        'photo' => $user->photo, // URL ảnh của người dùng (nếu có)
+    ]);
 }
 
        

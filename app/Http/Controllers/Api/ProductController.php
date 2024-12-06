@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Wishlist;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
@@ -143,7 +144,7 @@ class ProductController extends Controller
     public function getAllProductList(Request $request)
 {
     // Lấy tất cả sản phẩm trong hệ thống với phân trang
-    $products = Product::paginate(10); // Lấy 10 sản phẩm mỗi lần
+    $products = Product::paginate(20); // Lấy 10 sản phẩm mỗi lần
 
     // Chuyển đổi dữ liệu sản phẩm, thêm URL đầy đủ cho ảnh
     $transformedProducts = $products->getCollection()->transform(function ($product) {
@@ -225,4 +226,142 @@ class ProductController extends Controller
             'data' => $products,
         ]);
     }  
+    /**
+ * Lấy danh sách tất cả danh mục với phân trang.
+ */
+public function getAllCategoryList(Request $request)
+{
+    // Lấy tất cả danh mục cha với trạng thái 'active' và phân trang
+    $categories = Category::where('status', 'active')
+        ->orderBy('title', 'ASC') // Sắp xếp theo tiêu đề
+        ->paginate(10); // Số lượng danh mục mỗi lần (10)
+
+    // Chuyển đổi dữ liệu danh mục để định dạng hoặc thêm URL đầy đủ (nếu cần)
+    $transformedCategories = $categories->getCollection()->transform(function ($category) {
+        return [
+            'id' => $category->id,
+            'title' => $category->title,
+            'slug' => $category->slug, // Đường dẫn danh mục (SEO-friendly)
+            'photo' => url($category->photo), // URL đầy đủ của ảnh danh mục
+            'description' => $category->summary ?? '', // Mô tả ngắn
+            'is_parent' => $category->is_parent,
+        ];
+    });
+
+    // Tạo phản hồi JSON
+    return response()->json([
+        'status' => true,
+        'message' => 'Danh sách danh mục',
+        'data' => [
+            'categories' => $transformedCategories,
+            'pagination' => [
+                'current_page' => $categories->currentPage(),
+                'last_page' => $categories->lastPage(),
+                'per_page' => $categories->perPage(),
+                'total' => $categories->total(),
+            ],
+        ],
+    ]);
+}
+public function addToWishlist(Request $request)
+{
+    // Kiểm tra hợp lệ của 'product_id'
+    $validator = Validator::make($request->all(), [
+        'product_id' => 'required|numeric',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Product ID is required and must be a number',
+            'errors' => $validator->errors(),
+        ], 400);
+    }
+
+    // Lấy thông tin người dùng đã đăng nhập
+    $user = auth()->user();
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'User not authenticated',
+        ], 401);
+    }
+
+    // Kiểm tra nếu sản phẩm đã có trong danh sách yêu thích
+    $existingWishlist = Wishlist::where('product_id', $request->product_id)
+        ->where('user_id', $user->id)
+        ->first();
+
+    if ($existingWishlist) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Product is already in your wishlist',
+        ], 400);
+    }
+
+    // Thêm sản phẩm vào danh sách yêu thích
+    $wishlist = new Wishlist();
+    $wishlist->user_id = $user->id;
+    $wishlist->product_id = $request->product_id;
+    $wishlist->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Product added to wishlist successfully',
+    ], 200);
+}
+
+public function getWishlist(Request $request)
+{
+    $user = auth()->user();
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'User not authenticated',
+        ], 401);
+    }
+
+    // Lấy tất cả sản phẩm trong danh sách yêu thích của người dùng
+    $wishlist = Wishlist::where('user_id', $user->id)
+        ->join('products', 'wishlist.product_id', '=', 'products.id')
+        ->where('products.status', 'active')
+        ->select('products.id', 'products.title', 'products.price', 'products.photo')
+        ->get();
+
+    return response()->json([
+        'success' => true,
+        'wishlist' => $wishlist,
+    ], 200);
+}
+
+public function removeFromWishlist(Request $request, $product_id)
+{
+    $user = auth()->user();
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'User not authenticated',
+        ], 401);
+    }
+
+    // Kiểm tra nếu sản phẩm có trong danh sách yêu thích
+    $wishlist = Wishlist::where('user_id', $user->id)
+        ->where('product_id', $product_id)
+        ->first();
+
+    if (!$wishlist) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Product not found in your wishlist',
+        ], 404);
+    }
+
+    // Xóa sản phẩm khỏi danh sách yêu thích
+    $wishlist->delete();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Product removed from wishlist successfully',
+    ], 200);
+}
 }

@@ -48,6 +48,7 @@ class BlogController extends Controller
             ],
         ]);
     }
+    
 
     /**
      * Lấy bài viết theo danh mục.

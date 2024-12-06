@@ -40,4 +40,11 @@ Route::group(['namespace' => 'Api', 'prefix' => 'v1'], function () {
     Route::get('get_blog_categories', [\App\Http\Controllers\Api\BlogController::class, 'getAllBlogCategories']);
     Route::get('get_blog_details/{id}', [\App\Http\Controllers\Api\BlogController::class, 'getBlogDetails']);
     Route::get('search_blog', [\App\Http\Controllers\Api\BlogController::class, 'searchBlog']);
+    Route::get('getcategorylist', [\App\Http\Controllers\Api\ProductController::class, 'getAllCategoryList']);
+    Route::post('addtowishlist', [\App\Http\Controllers\Api\ProductController::class, 'addToWishlist']);
+    Route::get('getwishlist', [\App\Http\Controllers\Api\ProductController::class, 'getWishlist']);
+    Route::get('removefromwishlist', [\App\Http\Controllers\Api\ProductController::class, 'removeFromWishlist']);
+    Route::post('updateprofile', [\App\Http\Controllers\Api\AuthenticationController::class, 'updateprofile'])->middleware('auth:api');
+
 });
+
